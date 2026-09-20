@@ -1,0 +1,52 @@
+{
+  "overall": {
+    "retrieval_recall_at_k": 0.8089,
+    "citation_precision": 0.375,
+    "faithfulness": 0.8304,
+    "answer_relevance": 4.3571,
+    "end_to_end_correctness": 3.8571
+  },
+  "by_type": {
+    "follow_up": {
+      "retrieval_recall_at_k": 0.6667,
+      "citation_precision": 0.5,
+      "faithfulness": 1.0,
+      "answer_relevance": 4.6667,
+      "end_to_end_correctness": 4.3333
+    },
+    "single_hop": {
+      "retrieval_recall_at_k": 0.8571,
+      "citation_precision": 0.4286,
+      "faithfulness": 1.0,
+      "answer_relevance": 4.8571,
+      "end_to_end_correctness": 4.7143
+    },
+    "multi_hop": {
+      "retrieval_recall_at_k": 0.6917,
+      "citation_precision": 0.1667,
+      "faithfulness": 1.0,
+      "answer_relevance": 4.6667,
+      "end_to_end_correctness": 4.0
+    },
+    "conflicting": {
+      "retrieval_recall_at_k": 0.875,
+      "citation_precision": 0.125,
+      "faithfulness": 0.8125,
+      "answer_relevance": 4.75,
+      "end_to_end_correctness": 4.0
+    },
+    "unsupported": {
+      "retrieval_recall_at_k": 1.0,
+      "citation_precision": 0.6,
+      "faithfulness": 0.2,
+      "answer_relevance": 2.6,
+      "end_to_end_correctness": 1.8
+    }
+  },
+  "metadata": {
+    "completed_questions": 28,
+    "total_questions": 28,
+    "elapsed_seconds": 37907.08,
+    "timestamp": "2026-09-20 10:59:24"
+  }
+}
