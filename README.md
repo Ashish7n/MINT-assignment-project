@@ -163,20 +163,20 @@ The system was evaluated against an expanded benchmark suite of **28 comprehensi
 
 ---
 
-## 7. Observability & Reviewer Access
+## 7. Observability & Reviewer Verification
 
-Full execution traces, token consumption, latency breakdowns, and node inputs/outputs are tracked in **LangSmith**.
+Full execution traces, token consumption, latency breakdowns, and node inputs/outputs are systematically instrumented and captured in **LangSmith**.
 
 - **Project Name:** `kestrel-research-assistant`
-- **Reviewer Access:** Project access has been granted to **`radialpulse@nxtwave.co.in`**.
-- **Trace Spans Include:**
-  - `run_turn` (Root graph invocation)
-  - `input_guardrail_node`
-  - `router_node`
-  - `retriever_hybrid_search` & `retriever_rerank`
-  - `synthesizer_node`
-  - `critic_node`
-  - `output_guardrail_node`
+- **Designated Reviewer Access:** Configured per assignment guidelines for `radialpulse@nxtwave.co.in`.
+- **Trace Hierarchy & Spans:**
+  - `run_turn` (Root LangGraph state execution)
+  - `input_guardrail_node` (Deterministic & LLM safety checks)
+  - `router_node` (Coreference resolution & sub-query planning)
+  - `retriever_hybrid_search` & `retriever_rerank` (Dense + Sparse retrieval & Cross-Encoder re-scoring)
+  - `synthesizer_node` (Grounded draft generation & inline citations)
+  - `critic_node` (Sentence-level claim audit & verification verdicts)
+  - `output_guardrail_node` (Citation integrity & policy validation)
   - `invoke_groq_llm` (Prompt, completion, and token parameters)
 
 ---
