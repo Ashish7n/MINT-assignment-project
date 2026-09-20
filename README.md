@@ -1,6 +1,18 @@
+---
+title: Kestrel Labs Research Assistant
+emoji: 🦅
+colorFrom: indigo
+colorTo: purple
+sdk: streamlit
+sdk_version: 1.41.0
+app_file: app.py
+pinned: false
+---
+
 # Kestrel Labs Multi-Agent Research Assistant
 
 A multi-agent, LangGraph-orchestrated research assistant designed to answer questions about the fictional company **Kestrel Labs** using exclusively the provided `corpus.jsonl` (154 chunks / 25 documents).
+
 
 The assistant retrieves evidence, resolves coreferences, navigates temporal document conflicts, verifies claims sentence-by-sentence, enforces strict citation integrity, and audits its execution in LangSmith.
 
