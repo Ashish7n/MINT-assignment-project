@@ -1,14 +1,3 @@
----
-title: Kestrel Labs Research Assistant
-emoji: 🦅
-colorFrom: indigo
-colorTo: purple
-sdk: streamlit
-sdk_version: 1.41.0
-app_file: app.py
-pinned: false
----
-
 # 🦅 Kestrel Labs Multi-Agent Research Assistant
 
 A multi-agent, LangGraph-orchestrated research assistant designed to answer complex technical, pricing, and operational questions about the company **Kestrel Labs** using exclusively the provided `corpus.jsonl` (154 chunks / 25 documents).
