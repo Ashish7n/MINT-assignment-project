@@ -101,17 +101,18 @@ def critic_node(state: TaskBoard) -> Dict[str, Any]:
         overall_verdict = "insufficient_evidence"
 
 
-    missing_evidence_hint = parsed.get("missing_evidence_hint", "")
+    missing_evidence_hint = parsed.get("missing_evidence_hint") or ""
 
     # Increment revise_count if verdict requires revision
     new_revise_count = current_revise_count
     if overall_verdict in ("insufficient_evidence", "conflicting_evidence"):
         new_revise_count += 1
 
+    hint_snippet = missing_evidence_hint[:80] if missing_evidence_hint else ""
     trace_entry = AgentTraceEntry(
         agent="Critic",
         action="verify_claims",
-        detail=f"Overall verdict: {overall_verdict} (claims checked: {len(claim_verdicts)}, revise count: {new_revise_count}/2). Hint: {missing_evidence_hint[:80]}",
+        detail=f"Overall verdict: {overall_verdict} (claims checked: {len(claim_verdicts)}, revise count: {new_revise_count}/2). Hint: {hint_snippet}",
     )
 
     return {

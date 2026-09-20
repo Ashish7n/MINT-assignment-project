@@ -159,12 +159,12 @@ In strict compliance with the assignment grading criteria:
 
 | Question Typology | Test Cases | Retrieval Recall@K | Citation Precision | Faithfulness | Answer Relevance (1-5) | End-to-End Correctness (1-5) |
 |---|:---:|:---:|:---:|:---:|:---:|:---:|
-| **Single-Hop** | 7 | 0.86 | 0.43 | 1.00 | 4.86 / 5.0 | 4.71 / 5.0 |
-| **Multi-Hop** | 6 | 0.69 | 0.17 | 1.00 | 4.67 / 5.0 | 4.00 / 5.0 |
-| **Conflicting** | 4 | 0.88 | 0.13 | 0.81 | 4.75 / 5.0 | 4.00 / 5.0 |
+| **Single-Hop** | 7 | 0.86 | 0.19 | 1.00 | 4.86 / 5.0 | 4.71 / 5.0 |
+| **Multi-Hop** | 6 | 0.75 | 0.25 | 1.00 | 4.67 / 5.0 | 4.17 / 5.0 |
+| **Conflicting** | 4 | 0.75 | 0.65 | 1.00 | 5.00 / 5.0 | 4.50 / 5.0 |
 | **Unsupported** | 5 | 1.00 | 1.00 | 1.00 | 5.00 / 5.0 | 5.00 / 5.0 |
-| **Follow-Up (Multi-Turn)** | 6 | 0.67 | 0.50 | 1.00 | 4.67 / 5.0 | 4.33 / 5.0 |
-| **OVERALL BENCHMARK** | **28** | **0.81** | **0.45** | **0.97** | **4.79 / 5.0** | **4.43 / 5.0** |
+| **Follow-Up (Multi-Turn)** | 6 | 0.75 | 0.42 | 1.00 | 4.83 / 5.0 | 4.50 / 5.0 |
+| **OVERALL BENCHMARK** | **28** | **0.82** | **0.46** | **1.00** | **4.86 / 5.0** | **4.57 / 5.0** |
 
 ### Evaluation Artifacts
 - Complete execution log & judge rationales: [results/eval_results.jsonl](results/eval_results.jsonl)
