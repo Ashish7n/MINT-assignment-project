@@ -128,7 +128,6 @@ All dependencies and ingestion routines execute automatically on launch:
 ```bash
 # Mode 1: Interactive Multi-Turn Terminal CLI
 python main.py
-# (Windows: run.bat | Linux/Mac: ./run.sh)
 
 # Mode 2: Launch Interactive Streamlit Web Interface
 python main.py --app
@@ -193,8 +192,6 @@ Full execution traces, token consumption, latency breakdowns, and node inputs/ou
 ├── corpus.jsonl              # Fictional Kestrel Labs documentation (154 chunks)
 ├── main.py                   # Unified single-command entrypoint with auto-setup
 ├── requirements.txt          # Python dependencies
-├── run.bat                   # Windows one-click execution script
-├── run.sh                    # Linux/macOS execution script
 │
 ├── eval/
 │   └── run_eval.py           # Automated evaluation runner & LLM judge scoring
@@ -222,3 +219,4 @@ Full execution traces, token consumption, latency breakdowns, and node inputs/ou
         ├── hybrid_search.py  # Dense + Sparse RRF search implementation
         └── rerank.py         # Cross-Encoder neural reranking implementation
 ```
+
