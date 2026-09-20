@@ -68,20 +68,13 @@ flowchart TD
 
 ## 🚀 Setup & Run Instructions
 
-### 1. Installation & Clone
-Clone the repository and install dependencies (or let `main.py` auto-install them on first run):
+### 1. Clone & Configure Environment
 ```bash
 git clone https://github.com/Ashish7n/MINT-assignment-project.git
 cd MINT-assignment-project
-pip install -r requirements.txt
-```
-
-### 2. Environment Configuration
-Copy `.env.example` to `.env` and configure your API keys:
-```bash
 cp .env.example .env
 ```
-Fill in your credentials:
+Fill in your API keys in `.env`:
 ```env
 GROQ_API_KEY=gsk_...
 LANGCHAIN_TRACING_V2=true
@@ -90,26 +83,25 @@ LANGCHAIN_API_KEY=lsv2_pt_...
 LANGCHAIN_PROJECT=kestrel-research-assistant
 ```
 
-### 3. One-Command Execution (End-to-End)
+### 2. Run Everything with a Single Command
 
-The system automatically installs missing dependencies and builds the ChromaDB vector database and BM25 index on demand from `corpus.jsonl`. You can run the entire system end-to-end with **any of the following commands**:
+**No manual `pip install` or ingestion needed!** `main.py` automatically checks and installs any missing dependencies and builds the search indices on-the-fly.
 
 ```bash
-# Option A: Interactive Multi-Turn CLI Session
+# Option A: Interactive Multi-Turn CLI Assistant
 python main.py
 # (Windows: run.bat | Linux/Mac: ./run.sh)
 
-# Option B: Single Query Execution
-python main.py --query "What are Beacons in Kestrel Labs?"
-
-# Option C: Launch Interactive Streamlit Web UI
+# Option B: Launch Interactive Streamlit Web UI
 python main.py --app
-# (or: streamlit run app.py)
+
+# Option C: Single Query Execution
+python main.py --query "What are Beacons in Kestrel Labs?"
 
 # Option D: Run Full 28-Question Evaluation Suite
 python main.py --eval
-# (or: python eval/run_eval.py)
 ```
+
 
 
 ---
