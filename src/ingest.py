@@ -150,18 +150,23 @@ def build_bm25_index(chunks: List[Dict[str, Any]]) -> Tuple[BM25Okapi, List[str]
     return bm25, chunk_ids
 
 
+def ensure_ingested() -> None:
+    """Ensure ChromaDB and BM25 indices exist. Auto-build from corpus.jsonl if missing."""
+    if not CHROMA_DIR.exists() or not BM25_PATH.exists():
+        print("Indices not found. Auto-running ingestion pipeline from corpus.jsonl...")
+        main()
+
+
 def get_chroma_collection() -> chromadb.Collection:
-    """Access the persistent ChromaDB collection."""
-    if not CHROMA_DIR.exists():
-        raise FileNotFoundError(f"Chroma directory {CHROMA_DIR} not found. Run ingest.py first.")
+    """Access the persistent ChromaDB collection, auto-ingesting if not found."""
+    ensure_ingested()
     client = chromadb.PersistentClient(path=str(CHROMA_DIR))
     return client.get_collection(COLLECTION_NAME)
 
 
 def get_bm25_data() -> Dict[str, Any]:
-    """Load the persisted BM25 index and chunk mapping."""
-    if not BM25_PATH.exists():
-        raise FileNotFoundError(f"BM25 index not found at {BM25_PATH}. Run ingest.py first.")
+    """Load the persisted BM25 index and chunk mapping, auto-ingesting if not found."""
+    ensure_ingested()
     with open(BM25_PATH, "rb") as f:
         return pickle.load(f)
 

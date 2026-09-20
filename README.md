@@ -76,23 +76,27 @@ LANGCHAIN_API_KEY=lsv2_pt_...
 LANGCHAIN_PROJECT=kestrel-research-assistant
 ```
 
-### 3. Ingestion (Run Once)
-Build the ChromaDB vector database and BM25 index from `corpus.jsonl`:
-```bash
-python src/ingest.py
-```
+### 3. One-Command Execution (End-to-End)
 
-### 4. Run Frontend (Streamlit UI)
-Launch the interactive web application:
-```bash
-streamlit run app.py
-```
+The entire system supports automatic ingestion and runs end-to-end with a single command:
 
-### 5. Run Evaluation Suite
-Run the 16-question evaluation suite and generate metrics:
 ```bash
-python eval/run_eval.py
+# Option A: Interactive Terminal Assistant
+python main.py
+
+# Option B: Single-Query Execution
+python main.py --query "What are Beacons in Kestrel Labs?"
+
+# Option C: Launch Interactive Streamlit Web UI
+python main.py --app
+# (or: streamlit run app.py)
+
+# Option D: Run Full Evaluation Benchmark Suite
+python main.py --eval
+# (or: python eval/run_eval.py)
 ```
+*(Note: Ingestion from `corpus.jsonl` runs automatically on first launch if local indices are not yet built.)*
+
 
 ---
 
