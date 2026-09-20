@@ -68,9 +68,11 @@ flowchart TD
 
 ## 🚀 Setup & Run Instructions
 
-### 1. Installation
-Clone the repository and install dependencies:
+### 1. Installation & Clone
+Clone the repository and install dependencies (or let `main.py` auto-install them on first run):
 ```bash
+git clone https://github.com/Ashish7n/MINT-assignment-project.git
+cd MINT-assignment-project
 pip install -r requirements.txt
 ```
 
@@ -90,11 +92,12 @@ LANGCHAIN_PROJECT=kestrel-research-assistant
 
 ### 3. One-Command Execution (End-to-End)
 
-The system automatically builds the vector and BM25 indices on demand if they do not already exist. You can run the entire system end-to-end with **any of the following commands**:
+The system automatically installs missing dependencies and builds the ChromaDB vector database and BM25 index on demand from `corpus.jsonl`. You can run the entire system end-to-end with **any of the following commands**:
 
 ```bash
 # Option A: Interactive Multi-Turn CLI Session
 python main.py
+# (Windows: run.bat | Linux/Mac: ./run.sh)
 
 # Option B: Single Query Execution
 python main.py --query "What are Beacons in Kestrel Labs?"
@@ -107,6 +110,7 @@ python main.py --app
 python main.py --eval
 # (or: python eval/run_eval.py)
 ```
+
 
 ---
 
