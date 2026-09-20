@@ -18,11 +18,23 @@ CRITIC_PROMPT = (Path(__file__).parent.parent / "prompts" / "critic.txt").read_t
 @traceable(name="critic_node")
 def critic_node(state: TaskBoard) -> Dict[str, Any]:
     """Verify each claim against retrieved evidence and roll up overall verdict."""
+    resolved_query = state.get("resolved_query", state.get("original_query", ""))
     draft_answer = state.get("draft_answer", "")
     draft_citations = state.get("draft_citations", [])
     chunks = state.get("retrieved_chunks", [])
     top_chunks = chunks[:6]
     current_revise_count = state.get("revise_count", 0)
+
+    # Check if draft is explicitly declining an unsupported query
+    decline_phrases = [
+        "insufficient evidence", "not contain", "does not state", "not mentioned",
+        "unable to find", "no information", "not found", "does not provide",
+        "not specify", "not have", "does not have", "not listed", "does not mention",
+        "not explicitly mention", "no mention", "not support", "does not support"
+    ]
+    query_type = state.get("query_type", "single_hop")
+    is_declined = any(p in draft_answer.lower() for p in decline_phrases) or (query_type == "unsupported")
+    default_verdict = "insufficient_evidence" if is_declined else "supported"
 
     # Prepare payload
     chunk_payloads = [
@@ -37,6 +49,7 @@ def critic_node(state: TaskBoard) -> Dict[str, Any]:
     ]
 
     user_payload = {
+        "resolved_query": resolved_query,
         "draft_answer": draft_answer,
         "draft_citations": draft_citations,
         "retrieved_chunks": chunk_payloads,
@@ -54,14 +67,14 @@ def critic_node(state: TaskBoard) -> Dict[str, Any]:
         print(f"Critic verification fallback: {e}")
         parsed = {
             "claim_verdicts": [],
-            "overall_verdict": "supported",
+            "overall_verdict": default_verdict,
             "missing_evidence_hint": "",
         }
 
     if not isinstance(parsed, dict):
         parsed = {
             "claim_verdicts": [],
-            "overall_verdict": "supported",
+            "overall_verdict": default_verdict,
             "missing_evidence_hint": "",
         }
 
@@ -72,16 +85,21 @@ def critic_node(state: TaskBoard) -> Dict[str, Any]:
             claim_verdicts.append(
                 ClaimVerdict(
                     claim=v.get("claim", ""),
-                    verdict=v.get("verdict", "supported"),
+                    verdict=v.get("verdict", default_verdict),
                     supporting_chunk_ids=v.get("supporting_chunk_ids", []),
                     note=v.get("note", ""),
                 )
             )
 
-    overall_verdict = parsed.get("overall_verdict", "supported")
+    overall_verdict = parsed.get("overall_verdict", default_verdict)
     valid_verdicts = {"supported", "partially_supported", "conflicting_evidence", "insufficient_evidence"}
     if overall_verdict not in valid_verdicts:
-        overall_verdict = "supported"
+        overall_verdict = default_verdict
+
+    # If the draft explicitly declined due to no evidence in corpus, ensure verdict is insufficient_evidence
+    if is_declined:
+        overall_verdict = "insufficient_evidence"
+
 
     missing_evidence_hint = parsed.get("missing_evidence_hint", "")
 

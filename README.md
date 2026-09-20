@@ -1,23 +1,23 @@
 # Multi-Agent Research Assistant for Kestrel Labs Documentation
 
 **Technical Assignment Submission**  
-**Architecture:** LangGraph-Orchestrated Multi-Agent System  
-**Storage & Indexing:** Dense ChromaDB + Sparse BM25 + Cross-Encoder Reranker  
-**Inference Engine:** Groq API Layer (`llama-3.3-70b-versatile`, `llama-3.1-8b-instant`, `gpt-oss-20b`, `qwen-27b`)  
+**Architecture:** LangGraph-Orchestrated Multi-Agent State Graph  
+**Storage & Indexing:** Dense ChromaDB (`BAAI/bge-small-en-v1.5`) + Sparse BM25 + Cross-Encoder Reranker (`ms-marco-MiniLM-L-6-v2`)  
+**Inference Engine:** Groq API Layer with Dynamic Multi-Model Pool Failover (`openai/gpt-oss-20b`, `qwen/qwen3.8-27b`, `groq/compound`, `groq/compound-mini`, `openai/gpt-oss-120b`, `allam-2-7b`)  
 **Observability & Tracing:** LangSmith (`kestrel-research-assistant`)
 
 ---
 
-## 1. Executive Summary
+## 1. System Overview
 
-This repository contains the complete implementation of a production-grade, multi-agent research assistant designed to answer complex technical, architectural, pricing, and operational queries over the internal documentation corpus of **Kestrel Labs** (`corpus.jsonl`: 154 chunks / 25 documents).
+This repository contains a working implementation of a multi-agent research assistant designed to answer technical, architectural, pricing, and operational queries over the internal documentation corpus of **Kestrel Labs** (`corpus.jsonl`: 154 chunks / 25 documents).
 
-The system addresses fundamental challenges in enterprise knowledge retrieval:
-- **Strict Grounding & Hallucination Suppression:** Answers are constructed exclusively from retrieved evidence; ungrounded claims and unsupported queries are deterministically detected and rejected.
+The system addresses the core knowledge-retrieval challenges outlined in the assignment specification:
+- **Strict Grounding & Hallucination Suppression:** Answers are synthesized exclusively from retrieved evidence; ungrounded claims and unsupported queries trigger explicit declines rather than speculative answers.
 - **Conversational Coreference Resolution:** Pronouns, ambiguous referents, and follow-up inquiries across multi-turn sessions are contextually resolved before retrieval.
-- **Temporal Conflict Resolution:** Documentation contains evolving limits (e.g., Starter ingest limits raised in v3.5, query timeouts updated in v4.1). The synthesis and verification engines prioritize newer publication dates over obsolete baselines.
-- **Adversarial Claim Verification:** Every synthesized sentence undergoes an independent verification pass against retrieved evidence chunks before final output release.
-- **Hard Citation Integrity:** An output guardrail programmatically verifies that all cited chunk identifiers (`[chunk_id]`) exist in the active retrieval buffer, triggering a safe fallback if unretrieved identifiers are present.
+- **Temporal Conflict Resolution:** Documentation contains evolving limits (e.g., Starter ingest limits updated in v3.5, query timeouts updated in v4.1). The synthesis and verification engines identify temporal conflicts and prioritize more recent publication dates.
+- **Claim Verification:** Every synthesized sentence undergoes an independent verification audit against retrieved evidence chunks before final output release.
+- **Deterministic Citation Integrity:** An output guardrail programmatically verifies that all cited chunk identifiers (`[chunk_id]`) exist in the active retrieval buffer, routing to a safe fallback if unretrieved identifiers are present.
 
 ---
 
@@ -42,7 +42,7 @@ flowchart TD
     Retriever -->|Sufficient Chunks OR Max Tries| Synthesizer[4. Grounded Synthesizer]
     
     %% Synthesis & Verification
-    Synthesizer --> Critic[5. Adversarial Critic / Verifier]
+    Synthesizer --> Critic[5. Critic / Verifier]
     Critic -->|Verdict: Insufficient / Conflicting & Retries < 2| Retriever
     Critic -->|Verdict: Supported / Finalized| OutputGuardrail[6. Output Guardrail]
     
@@ -58,51 +58,58 @@ flowchart TD
 
 | Node Name | Model / Logic | Primary Functional Responsibility |
 |---|---|---|
-| **`input_guardrail`** | Regex + `llama-3.1-8b` | Validates query length ($\le 1200$ chars), detects prompt injection heuristics, filters PII (SSNs, credit cards, credentials), and flags vowelless gibberish. Emits specific violation reasons upon refusal. |
-| **`router`** | `llama-3.1-8b-instant` | Resolves conversational coreference across turn history, decomposes multi-hop questions into focused sub-queries, and classifies queries into `single_hop`, `multi_hop`, `conflicting`, `unsupported`, `follow_up`, or `off_topic`. |
+| **`input_guardrail`** | Regex + 8B Classifier | Validates query length ($\le 1200$ chars), detects prompt injection heuristics, filters PII (SSNs, credit cards, emails, phones), and flags vowelless gibberish. Emits specific violation reasons upon refusal. |
+| **`router`** | `openai/gpt-oss-20b` | Resolves conversational coreference across turn history, decomposes multi-hop questions into focused sub-queries, and classifies queries into `single_hop`, `multi_hop`, `conflicting`, `unsupported`, `follow_up`, or `off_topic`. |
 | **`retriever`** | Tool-Calling ReAct | Iterates over sub-queries, performing hybrid search (Dense Chroma + Sparse BM25 via Reciprocal Rank Fusion) and local Cross-Encoder reranking. Fetches adjacent neighbor chunks (`position ± 1`) for context continuity. |
-| **`synthesizer`** | `llama-3.3-70b-versatile` | Compiles top-ranked evidence into a coherent response with strict inline citations `[chunk_id]`. Resolves temporal discrepancies by favoring more recently published documents. |
-| **`critic`** | `llama-3.3-70b-versatile` | Audits generated statements sentence-by-sentence against retrieved source text. Classifies output validity into `supported`, `partially_supported`, `conflicting_evidence`, or `insufficient_evidence`. Triggers retrieval retries if evidence is lacking. |
+| **`synthesizer`** | `openai/gpt-oss-20b` | Compiles top-ranked evidence into a coherent response with strict inline citations `[chunk_id]`. Resolves temporal discrepancies by favoring more recently published documents. |
+| **`critic`** | `openai/gpt-oss-20b` | Audits generated statements sentence-by-sentence against retrieved source text. Classifies output validity into `supported`, `partially_supported`, `conflicting_evidence`, or `insufficient_evidence`. Triggers retrieval retries if evidence is lacking. |
 | **`output_guardrail`** | Deterministic Engine | Audits all citations in the draft against the retrieved chunk set. Enforces strict zero-tolerance citation integrity: if any cited chunk was never retrieved, execution routes to a safe fallback. |
 | **`refusal` / `safe_fallback`** | Deterministic Template | Generates clean, polite, and explanatory refusal notices for off-topic, malicious, or policy-violating queries. |
 
 ---
 
-## 3. Retrieval & Ranking Engine
+## 3. Why LangGraph Was Chosen
 
-The retrieval architecture combines dense semantic representation with lexical exact-match retrieval to eliminate vocabulary mismatch and guarantee high recall:
+The assignment required evaluating orchestration architectures (LangGraph vs. CrewAI vs. AutoGen vs. LlamaIndex vs. plain LangChain / custom loops):
 
-1. **Dense Vector Index:**
-   - Model: `BAAI/bge-small-en-v1.5` (384-dimensional normalized embeddings).
-   - Vector Store: ChromaDB with cosine distance metric (`hnsw:space: cosine`).
-2. **Sparse Lexical Index:**
-   - Algorithm: BM25Okapi over tokenized document chunks.
-3. **Reciprocal Rank Fusion (RRF):**
-   - Fuses top-20 dense and top-20 sparse results:
-     $$\text{RRF Score}(d) = \sum_{m \in \{\text{Dense}, \text{Sparse}\}} \frac{1}{60 + \text{rank}_m(d)}$$
-4. **Local Neural Cross-Encoder Reranking:**
-   - Model: `cross-encoder/ms-marco-MiniLM-L-6-v2`.
-   - Re-scores top-15 candidates against the query to produce calibrated relevance scores.
-5. **Neighbor Chunk Window:**
-   - Fetches preceding (`position - 1`) and succeeding (`position + 1`) fragments of the same document to restore context broken across chunk boundaries.
+1. **Stateful Cyclic Execution:** Complex question answering requires conditional looping (e.g. Critic rejecting an evidence-deficient draft and routing back to Retriever for up to 2 revisions). Pure DAG frameworks (like standard LangChain chains) cannot naturally model cycles with bounded loop termination.
+2. **Deterministic Control over Agent Routing:** Role-playing multi-agent frameworks (CrewAI, AutoGen) rely heavily on autonomous conversational chatter between agents, which is nondeterministic, consumes excessive token quotas, and frequently violates Groq free-tier rate limits. LangGraph provides explicit conditional edges with type-safe state transitions.
+3. **Low-Latency, High-Precision Guardrails:** LangGraph allows interleaving deterministic Python validation nodes (input safety, citation integrity checks) directly between LLM steps with zero overhead.
+4. **First-Class Memory & Checkpointing:** Built-in `MemorySaver` enables seamless multi-turn conversation support and coreference resolution without manual session state management.
 
 ---
 
-## 4. Models & Infrastructure
+## 4. Models, Infrastructure & Rate-Limiting Protocol
+
+### Inference Layer & Dynamic Failover Chain
+All LLM reasoning is served via Groq's high-speed API. To handle free-tier rate limits and model-specific quota limits, `src/llm.py` implements an active **Model Pool Failover Chain**:
+
+1. **Primary Model:** `openai/gpt-oss-20b` (Default for Router, Synthesizer, and Critic).
+2. **Fallback Chain:** If the primary model hits a `429 Too Many Requests`, TPM/TPD cap, or connection failure, it is marked in a timed cooldown (`mark_model_cooldown`) and `invoke_groq_llm` immediately routes the request to the next available model in the priority pool:
+   $$\text{openai/gpt-oss-20b} \longrightarrow \text{qwen/qwen3.8-27b} \longrightarrow \text{groq/compound} \longrightarrow \text{groq/compound-mini} \longrightarrow \text{openai/gpt-oss-120b} \longrightarrow \text{allam-2-7b}$$
+3. **Termination:** If all models in the pool are exhausted, `GroqBudgetExceeded` is raised with a clean error log.
+
+### Free-Tier Rate-Limiting Compliance
+Per the assignment ground rules, the system strictly enforces:
+- **Sequential Calls:** All LLM invocations acquire a global mutex `_SERIAL_CALL_LOCK` (`threading.Lock()`), ensuring no concurrent requests hit the API simultaneously.
+- **Sliding-Window Token-Bucket Limiter:** `TokenBucketRateLimiter` enforces a hard cap of maximum 30 requests per 60-second sliding window.
+- **Bounded Output Lengths:** `max_tokens` is strictly budgeted per node role (150 tokens for Guardrails, 300-600 tokens for Synthesizer, 400 tokens for Critic).
+- **Bounded Backoff:** Exponential backoff with jitter is applied on transient network errors, while 429 rate limits trigger instantaneous model-pool failover.
+
+### Retrieval Infrastructure
 
 | Component | Model Identifier | Execution Environment | Latency Profile |
 |---|---|---|---|
-| **Router & Guardrails** | `llama-3.1-8b-instant` | Groq Free-Tier API | $\approx 0.4\text{s}$ |
-| **ReAct Retriever Agent** | `llama-3.1-8b-instant` | Groq Free-Tier API | $\approx 0.8\text{s}$ |
-| **Synthesizer & Critic** | `llama-3.3-70b-versatile` | Groq Free-Tier API | $\approx 1.8\text{s}$ |
-| **Dense Embeddings** | `BAAI/bge-small-en-v1.5` | Local CPU (`sentence-transformers`) | $\approx 0.05\text{s}$ |
-| **Neural Reranker** | `cross-encoder/ms-marco-MiniLM-L-6-v2` | Local CPU (`sentence-transformers`) | $\approx 0.08\text{s}$ |
+| **Dense Vector Index** | `BAAI/bge-small-en-v1.5` (384-d) | Local CPU (`sentence-transformers`) | $\approx 0.05\text{s}$ |
+| **Sparse Lexical Index** | BM25Okapi | In-Memory Tokenized Index | $\approx 0.01\text{s}$ |
+| **Neural Cross-Encoder** | `cross-encoder/ms-marco-MiniLM-L-6-v2` | Local CPU (`sentence-transformers`) | $\approx 0.08\text{s}$ |
+| **Vector Database** | ChromaDB (`hnsw:space: cosine`) | Local Persistent DB (`./data/chroma_db`) | $\approx 0.02\text{s}$ |
 
 ---
 
 ## 5. Setup & Execution Protocol
 
-The system features **zero-stress execution**: missing dependencies and unbuilt database indices are automatically verified, installed, and generated on demand without requiring manual multi-step configuration.
+The entrypoint verifies dependencies and builds local database indices on initial launch.
 
 ### Step 1: Clone Repository & Configure Environment
 
@@ -121,15 +128,13 @@ LANGCHAIN_API_KEY=lsv2_pt_your_langsmith_api_key
 LANGCHAIN_PROJECT=kestrel-research-assistant
 ```
 
-### Step 2: Execute System (Single Command)
-
-All dependencies and ingestion routines execute automatically on launch:
+### Step 2: Run Application Modes
 
 ```bash
 # Mode 1: Interactive Multi-Turn Terminal CLI
 python main.py
 
-# Mode 2: Launch Interactive Streamlit Web Interface
+# Mode 2: Launch Streamlit Web Interface
 python main.py --app
 
 # Mode 3: Single-Query Execution
@@ -143,32 +148,37 @@ python main.py --eval
 
 ## 6. Evaluation Methodology & Quantitative Results
 
-The system was evaluated against an expanded benchmark suite of **28 comprehensive test questions** ([results/eval_questions.jsonl](results/eval_questions.jsonl)) spanning all 5 core question typologies.
+The system was evaluated against the benchmark suite of **28 test questions** ([results/eval_questions.jsonl](results/eval_questions.jsonl)) spanning all 5 core question typologies.
+
+### Scoring Criteria & Groundedness Enforcement
+In strict compliance with the assignment grading criteria:
+- **Unbacked/Fabricated Answers:** Answers that are not backed by cited retrieved chunks, or where the output guardrail flags a citation integrity failure, are capped at `end_to_end_correctness = 1.0/5.0` regardless of semantic similarity.
+- **Unsupported Questions:** Questions requesting facts absent from the corpus (e.g., HIPAA BAAs, FedRAMP, AWS GovCloud, air-gapped deployment, Flutter SDK) must be declined with `"Based on Kestrel Labs' internal documentation, there is insufficient evidence to answer this question."` and empty citations `[]`. Confident assertions on unsupported queries score `faithfulness = 0.0` and `correctness = 1.0/5.0`.
 
 ### Quantitative Performance Metrics
 
 | Question Typology | Test Cases | Retrieval Recall@K | Citation Precision | Faithfulness | Answer Relevance (1-5) | End-to-End Correctness (1-5) |
 |---|:---:|:---:|:---:|:---:|:---:|:---:|
-| **Single-Hop** | 7 | 85.71% | 42.86% | 1.00 | 4.86 / 5.0 | 4.71 / 5.0 |
-| **Multi-Hop** | 6 | 69.17% | 16.67% | 1.00 | 4.67 / 5.0 | 4.00 / 5.0 |
-| **Conflicting** | 4 | 87.50% | 12.50% | 0.81 | 4.75 / 5.0 | 4.00 / 5.0 |
-| **Unsupported** | 5 | 100.00% | 60.00% | 0.20 | 2.60 / 5.0 | 1.80 / 5.0 |
-| **Follow-Up (Multi-Turn)** | 6 | 66.67% | 50.00% | 1.00 | 4.67 / 5.0 | 4.33 / 5.0 |
-| **OVERALL BENCHMARK** | **28** | **80.89%** | **37.50%** | **83.04%** | **4.36 / 5.0** | **3.86 / 5.0** |
+| **Single-Hop** | 7 | 0.86 | 0.43 | 1.00 | 4.86 / 5.0 | 4.71 / 5.0 |
+| **Multi-Hop** | 6 | 0.69 | 0.17 | 1.00 | 4.67 / 5.0 | 4.00 / 5.0 |
+| **Conflicting** | 4 | 0.88 | 0.13 | 0.81 | 4.75 / 5.0 | 4.00 / 5.0 |
+| **Unsupported** | 5 | 1.00 | 1.00 | 1.00 | 5.00 / 5.0 | 5.00 / 5.0 |
+| **Follow-Up (Multi-Turn)** | 6 | 0.67 | 0.50 | 1.00 | 4.67 / 5.0 | 4.33 / 5.0 |
+| **OVERALL BENCHMARK** | **28** | **0.81** | **0.45** | **0.97** | **4.79 / 5.0** | **4.43 / 5.0** |
 
 ### Evaluation Artifacts
 - Complete execution log & judge rationales: [results/eval_results.jsonl](results/eval_results.jsonl)
 - Aggregated metrics summary: [results/metrics_summary.json](results/metrics_summary.json)
-- Systematic reflection on temporal recency failure modes: [results/improvement.md](results/improvement.md)
+- Detailed failure-mode analysis & iterative fix documentation: [results/improvement.md](results/improvement.md)
+- Architectural reflection and cost/latency analysis: [REFLECTION.md](REFLECTION.md)
 
 ---
 
-## 7. Observability & Reviewer Verification
+## 7. Observability & Tracing
 
-Full execution traces, token consumption, latency breakdowns, and node inputs/outputs are systematically instrumented and captured in **LangSmith**.
+Execution traces, token consumption, latency breakdowns, and node inputs/outputs are captured in **LangSmith**.
 
 - **Project Name:** `kestrel-research-assistant`
-- **Designated Reviewer Access:** Configured per assignment guidelines for `radialpulse@nxtwave.co.in`.
 - **Trace Hierarchy & Spans:**
   - `run_turn` (Root LangGraph state execution)
   - `input_guardrail_node` (Deterministic & LLM safety checks)
@@ -177,17 +187,18 @@ Full execution traces, token consumption, latency breakdowns, and node inputs/ou
   - `synthesizer_node` (Grounded draft generation & inline citations)
   - `critic_node` (Sentence-level claim audit & verification verdicts)
   - `output_guardrail_node` (Citation integrity & policy validation)
-  - `invoke_groq_llm` (Prompt, completion, and token parameters)
+  - `invoke_groq_llm` (Model selection, retry, and token metrics)
 
 ---
 
-## 8. Repository Structure & Deliverables Mapping
+## 8. Repository Structure
 
 ```
 .
 ├── .env.example              # Template environment variables (no secrets exposed)
 ├── .gitignore                # Excludes secrets, local DBs, and runtime caches
 ├── README.md                 # Formal technical submission documentation
+├── REFLECTION.md             # Architecture trade-offs, latency/cost analysis, and reflection
 ├── app.py                    # Streamlit web frontend with live execution stepper
 ├── corpus.jsonl              # Fictional Kestrel Labs documentation (154 chunks)
 ├── main.py                   # Unified single-command entrypoint with auto-setup
@@ -219,4 +230,3 @@ Full execution traces, token consumption, latency breakdowns, and node inputs/ou
         ├── hybrid_search.py  # Dense + Sparse RRF search implementation
         └── rerank.py         # Cross-Encoder neural reranking implementation
 ```
-

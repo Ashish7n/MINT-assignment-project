@@ -214,16 +214,13 @@ def output_guardrail_node(state: TaskBoard) -> Dict[str, Any]:
         }
 
     # 3. Deterministic Verdict-Consistency Check
-    # If overall_verdict is insufficient_evidence, answer must not assert unhedged facts
+    # If overall_verdict is insufficient_evidence, answer must strictly be the standard decline
     if overall_verdict == "insufficient_evidence":
-        hedges = ["not contain", "insufficient", "not found", "does not state", "not mentioned", "unable to find", "no information"]
-        has_hedge = any(h in final_answer.lower() for h in hedges)
-        if not has_hedge:
-            final_answer = (
-                "Based on Kestrel Labs' internal documentation, there is insufficient evidence "
-                "to answer this question."
-            )
-            valid_citations = []
+        final_answer = (
+            "Based on Kestrel Labs' internal documentation, there is insufficient evidence "
+            "to answer this question."
+        )
+        valid_citations = []
 
     # 4. LLM Classifier (8B) check on borderline/unhedged answers only
     suspicious_output = ["secret", "credential", "password", "api_key", "bearer", "token"]

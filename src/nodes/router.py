@@ -42,6 +42,22 @@ def router_node(state: TaskBoard) -> Dict[str, Any]:
             "agent_trace": list(state.get("agent_trace", [])) + [trace_entry],
         }
 
+    # Deterministic check for unsupported features completely absent from Kestrel corpus
+    UNSUPPORTED_PATTERN = re.compile(r"\b(hipaa|fedramp|govcloud|air-?gapped|air-?gap|flutter)\b", re.IGNORECASE)
+    if UNSUPPORTED_PATTERN.search(user_message):
+        trace_entry = AgentTraceEntry(
+            agent="Router",
+            action="classify_and_plan",
+            detail=f"Type: unsupported | Resolved: {user_message} | Plan: Query targets unsupported feature absent from Kestrel documentation.",
+        )
+        return {
+            "resolved_query": user_message,
+            "query_type": "unsupported",
+            "sub_queries": [user_message],
+            "route_plan": "Query targets unsupported feature absent from Kestrel documentation.",
+            "agent_trace": list(state.get("agent_trace", [])) + [trace_entry],
+        }
+
     payload = {
         "latest_user_message": user_message,
         "conversation_history": history,

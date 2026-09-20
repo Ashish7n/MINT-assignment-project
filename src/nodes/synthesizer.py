@@ -22,19 +22,20 @@ def synthesizer_node(state: TaskBoard) -> Dict[str, Any]:
     resolved_query = state.get("resolved_query", state.get("original_query", ""))
     sub_queries = state.get("sub_queries", [])
     chunks = state.get("retrieved_chunks", [])
+    query_type = state.get("query_type", "single_hop")
     # Keep top 6 chunks to ensure multi-hop sub-query evidence is fully represented
     top_chunks = chunks[:6]
 
-    # If no chunks were retrieved at all, return decline immediately
-    if not top_chunks:
+    # If query was classified as unsupported or no chunks were retrieved, return standard decline immediately
+    if query_type == "unsupported" or not top_chunks:
         return {
-            "draft_answer": "The internal corpus does not contain sufficient evidence to answer this question.",
+            "draft_answer": "Based on Kestrel Labs' internal documentation, there is insufficient evidence to answer this question.",
             "draft_citations": [],
             "agent_trace": [
                 AgentTraceEntry(
                     agent="Synthesizer",
                     action="decline_no_evidence",
-                    detail="No evidence chunks retrieved; declining unsupported query.",
+                    detail="Unsupported query type or no evidence chunks retrieved; declining cleanly.",
                 )
             ],
         }
@@ -87,6 +88,13 @@ def synthesizer_node(state: TaskBoard) -> Dict[str, Any]:
                 best_score = score
                 best_sentence = s
 
+        # If query terms do not match chunk text at all, decline rather than hallucinating
+        if best_score <= 0:
+            return {
+                "draft_answer": "Based on Kestrel Labs' internal documentation, there is insufficient evidence to answer this question.",
+                "draft_citations": [],
+            }
+
         if not best_sentence.endswith("."):
             best_sentence += "."
 
@@ -126,6 +134,11 @@ def synthesizer_node(state: TaskBoard) -> Dict[str, Any]:
                 for cid in set(extracted_cids)
                 if cid in title_map
             ]
+
+    # If the draft explicitly states insufficient evidence or declines, do not attach citations
+    decline_markers = ["insufficient evidence", "not contain", "does not state", "not mentioned", "unable to find", "no information"]
+    if any(m in draft_answer.lower() for m in decline_markers):
+        draft_citations = []
 
     # Clean any trailing unclosed braces or code fences from draft_answer
     draft_answer = re.sub(r"\n\s*\{\s*$", "", draft_answer).strip()
