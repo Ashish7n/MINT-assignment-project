@@ -1,24 +1,64 @@
 """Unified Entrypoint for Kestrel Labs Multi-Agent Assistant.
 
-Allows running the entire system end-to-end with a single command:
+Allows running the entire system end-to-end with a single command with zero stress:
+  - Auto-checks and installs missing dependencies from requirements.txt
+  - Auto-builds ChromaDB vector database and BM25 index from corpus.jsonl
+  - Executes Interactive CLI, Streamlit UI, Single Query, or Evaluation Benchmark.
+
+Usage:
   1. Interactive CLI:   python main.py
-  2. Single Query:      python main.py --query "What are Beacons in Kestrel Labs?"
-  3. Streamlit Web UI:  python main.py --app
+  2. Streamlit Web UI:  python main.py --app
+  3. Single Query:      python main.py --query "What are Beacons in Kestrel Labs?"
   4. Evaluation Suite:  python main.py --eval
 """
 
-import argparse
 import os
 import subprocess
 import sys
-from dotenv import load_dotenv
+from pathlib import Path
 
 # Ensure repo root is on sys.path
-from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+
+def ensure_dependencies() -> None:
+    """Auto-detect and install missing dependencies with zero user friction."""
+    required = [
+        ("dotenv", "python-dotenv"),
+        ("langchain", "langchain"),
+        ("langgraph", "langgraph"),
+        ("langchain_groq", "langchain-groq"),
+        ("langsmith", "langsmith"),
+        ("sentence_transformers", "sentence-transformers"),
+        ("chromadb", "chromadb"),
+        ("rank_bm25", "rank-bm25"),
+        ("streamlit", "streamlit"),
+        ("tenacity", "tenacity"),
+        ("pydantic", "pydantic"),
+    ]
+    missing = []
+    for mod, pkg in required:
+        try:
+            __import__(mod)
+        except ImportError:
+            missing.append(pkg)
+
+    if missing:
+        req_file = REPO_ROOT / "requirements.txt"
+        print(f"📦 Installing required dependencies from {req_file.name}...")
+        try:
+            subprocess.check_call([sys.executable, "-m", "pip", "install", "-r", str(req_file)])
+            print("✅ All dependencies installed successfully!\n")
+        except Exception as e:
+            print(f"⚠️ Warning: Auto-install failed ({e}). Proceeding...")
+
+
+# Run dependency auto-installer before importing local modules
+ensure_dependencies()
+
+from dotenv import load_dotenv
 load_dotenv(override=True)
 
 if hasattr(sys.stdout, "reconfigure"):
@@ -27,6 +67,7 @@ if hasattr(sys.stdout, "reconfigure"):
     except Exception:
         pass
 
+import argparse
 from src.ingest import ensure_ingested
 from src.graph import run_turn
 
@@ -51,7 +92,7 @@ def run_interactive_cli() -> None:
 
             print("\n[Assistant is thinking...]")
             state = run_turn(conversation_id=conversation_id, user_message=user_input, verbose=True)
-            
+
             print("\n" + "-" * 50)
             print("Final Answer:")
             print(state.get("final_answer", "No answer generated."))
@@ -104,4 +145,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
